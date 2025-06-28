@@ -1,0 +1,33 @@
+# Ignore Git files
+.git
+.gitignore
+
+# Ignore IDE files
+.idea
+*.iml
+.vscode
+*.swp
+*.swo
+
+# Ignore build artifacts
+target/
+build/
+*.jar
+*.war
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Ignore documentation
+README.md
+*.md
+
+# Ignore logs
+logs/
+*.log

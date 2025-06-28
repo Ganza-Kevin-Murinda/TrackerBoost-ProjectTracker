@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Admin Login</title>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f5f5f5; } .login-container { padding: 20px; border: 1px solid #ccc; border-radius: 5px; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 400px; } .form-group { margin-bottom: 15px; } input { padding: 8px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; } button { padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; } button:hover { background-color: #0056b3; } #token-section { display: none; margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 4px; } #token-display { word-break: break-all; margin-bottom: 10px; padding: 10px; background-color: #e9ecef; border-radius: 4px; font-family: monospace; } .copy-button { background-color: #28a745; margin-top: 10px; } .copy-button:hover { background-color: #218838; } .navigate-button { background-color: #17a2b8; margin-top: 10px; } .navigate-button:hover { background-color: #138496; } #message { color: #dc3545; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="login-container">
+    <h2>Admin Login</h2>
+    <div class="form-group">
+        <input type="text" id="username" placeholder="Username">
+    </div>
+    <div class="form-group">
+        <input type="password" id="password" placeholder="Password">
+    </div>
+    <button onclick="login()">Login</button>
+    <p id="message"></p>
+
+    <div id="token-section">
+        <h3>Your JWT Token:</h3>
+        <div id="token-display"></div>
+        <button onclick="copyToken()" class="copy-button">Copy Token</button>
+        <button onclick="navigateToSwagger()" class="navigate-button">Go to Swagger UI</button>
+    </div>
+</div>
+
+<script>
+    async function login() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        try {
+            const response = await fetch('/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+            console.log('Response data:', data); // For debugging
+
+            if (response.ok && data.data && data.data.token) {
+                // Store the token
+                const token = data.data.token;
+                localStorage.setItem('jwt_token', token);
+
+                // Display the token
+                document.getElementById('token-section').style.display = 'block';
+                document.getElementById('token-display').textContent = token;
+                document.getElementById('message').textContent = 'Login successful!';
+                document.getElementById('message').style.color = '#28a745';
+            } else {
+                const errorMessage = data.message || 'Login failed';
+                document.getElementById('message').textContent = errorMessage;
+                document.getElementById('message').style.color = '#dc3545';
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            document.getElementById('message').textContent = 'Error: ' + error.message;
+            document.getElementById('message').style.color = '#dc3545';
+        }
+    }
+    function copyToken() {
+        const tokenDisplay = document.getElementById('token-display');
+        const token = tokenDisplay.textContent.trim();
+
+        if (token) {
+            navigator.clipboard.writeText(token)
+                .then(() => {
+                    const copyButton = document.querySelector('.copy-button');
+                    copyButton.textContent = 'Copied!';
+                    setTimeout(() => {
+                        copyButton.textContent = 'Copy Token';
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy:', err);
+                    document.getElementById('message').textContent = 'Failed to copy token';
+                    document.getElementById('message').style.color = '#dc3545';
+                });
+        } else {
+            document.getElementById('message').textContent = 'No token to copy';
+            document.getElementById('message').style.color = '#dc3545';
+        }
+    }
+
+    function navigateToSwagger() {
+        const token = localStorage.getItem('jwt_token');
+        if (token) {
+            window.location.href = '/swagger-ui/index.html';
+        } else {
+            document.getElementById('message').textContent = 'Please login first';
+            document.getElementById('message').style.color = '#dc3545';
+        }
+    }
+</script>
+</body>
+</html>

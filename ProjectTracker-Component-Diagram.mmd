@@ -1,0 +1,156 @@
+---
+config:
+  layout: fixed
+---
+flowchart TB
+ subgraph subGraph0["External Interfaces"]
+        CLIENT["📱 Client Applications<br>Web, Mobile, API Consumers"]
+        POSTGRES["🐘 PostgreSQL Database<br>Projects, Developers, Tasks<br>Port 5432"]
+        MONGO["🍃 MongoDB<br>Audit Logs<br>Port 27017"]
+        CACHE["💾 Spring Cache<br>In-Memory Caching<br>Performance Layer"]
+  end
+ subgraph subGraph1["REST API Layer (Controllers)"]
+        PC["📊 ProjectController<br>@RestController<br>/api/projects/*"]
+        DC["👥 DeveloperController<br>@RestController<br>/api/developers/*"]
+        TC["📋 TaskController<br>@RestController<br>/api/tasks/*"]
+        AC["📝 AuditController<br>@RestController<br>/api/audit/*"]
+        EH["⚠️ GlobalExceptionHandler<br>@ControllerAdvice<br>Centralized Error Handling"]
+  end
+ subgraph subGraph2["Service Layer (Business Logic)"]
+        PS["📊 ProjectService<br>@Service @Transactional<br>@Cacheable Operations"]
+        DS["👥 DeveloperService<br>@Service @Transactional<br>@Cacheable Operations"]
+        TS["📋 TaskService<br>@Service @Transactional<br>@Cacheable Operations"]
+        AS["📝 AuditService<br>@Service<br>Async Processing"]
+        PSI["📊 ProjectServiceImpl<br>Business Rules &amp; Validation"]
+        DSI["👥 DeveloperServiceImpl<br>Business Rules &amp; Validation"]
+        TSI["📋 TaskServiceImpl<br>Business Rules &amp; Validation"]
+        ASI["📝 AuditServiceImpl<br>Event Processing"]
+  end
+ subgraph subGraph3["Repository Layer (Data Access)"]
+        PR["📊 ProjectRepository<br>@Repository JpaRepository<br>Custom Queries &amp; Pagination"]
+        DR["👥 DeveloperRepository<br>@Repository JpaRepository<br>Custom Queries &amp; Pagination"]
+        TR["📋 TaskRepository<br>@Repository JpaRepository<br>Custom Queries &amp; Pagination"]
+        AR["📝 AuditLogRepository<br>@Repository MongoRepository<br>Audit Queries &amp; Pagination"]
+  end
+ subgraph subGraph4["Domain Models & DTOs"]
+        PE["📊 Project Entity<br>@Entity @OneToMany<br>id, name, description, deadline, status"]
+        DE["👥 Developer Entity<br>@Entity @OneToMany<br>id, name, email, skills"]
+        TE["📋 Task Entity<br>@Entity @ManyToOne<br>id, title, description, status, priority"]
+        AE["📝 AuditLog Document<br>@Document MongoDB<br>actionType, entityType, timestamp"]
+        PDTO["📊 ProjectDTO<br>@Schema Validation<br>API Data Transfer"]
+        DDTO["👥 DeveloperDTO<br>@Schema Validation<br>API Data Transfer"]
+        TDTO["📋 TaskDTO<br>@Schema Validation<br>API Data Transfer"]
+        ADTO["📝 AuditLogDTO<br>@Schema Formatted<br>API Data Transfer"]
+        PAGE["📄 PageResponseDTO<br>Generic Paginated<br>Response Wrapper"]
+  end
+ subgraph subGraph5["Enums & Constants"]
+        PROJSTATUS["📊 ProjectStatus<br>PLANNING, IN_PROGRESS<br>COMPLETED, ON_HOLD, CANCELLED"]
+        TASKSTATUS["📋 TaskStatus<br>TODO, IN_PROGRESS<br>COMPLETED, BLOCKED"]
+        PRIORITY["⭐ Priority<br>LOW, MEDIUM<br>HIGH, CRITICAL"]
+        ACTION["🎬 ActionType<br>CREATE, UPDATE<br>DELETE"]
+  end
+ subgraph subGraph6["Configuration Layer"]
+        DBCONFIG["🔧 DatabaseConfig<br>@EnableJpaRepositories<br>@EnableTransactionManagement"]
+        MONGOCONFIG["🔧 MongoConfig<br>@EnableMongoRepositories<br>Audit Package Configuration"]
+        CACHECONFIG["🔧 CacheConfig<br>@EnableCaching<br>Cache Strategy &amp; Eviction"]
+        SWAGGERCONFIG["🔧 SwaggerConfig<br>OpenAPI Configuration<br>Documentation Setup"]
+  end
+ subgraph subGraph7["Cross-Cutting Concerns"]
+        LOG["📝 Logging Framework<br>SLF4J + Logback<br>Structured Application Logs"]
+        VAL["✅ Validation Framework<br>Bean Validation<br>Custom Business Rules"]
+        EVENTS["📡 AuditEventPublisher<br>Event Publishing<br>Async Audit Processing"]
+        EXCEPTIONS["⚠️ Custom Exceptions<br>ResourceNotFoundException<br>ValidationException"]
+  end
+ subgraph Documentation["API Documentation"]
+        SWAGGER["📚 Swagger UI<br>/swagger-ui.html<br>Interactive API Docs"]
+        OPENAPI["📖 OpenAPI Specs<br>Complete API Schema<br>Request/Response Models"]
+  end
+    CLIENT --> PC & DC & TC & AC & SWAGGER
+    PC --> PS & EH & PDTO & PAGE
+    DC --> DS & EH & DDTO & PAGE
+    TC --> TS & EH & TDTO & PAGE
+    AC --> AS & EH & ADTO & PAGE
+    PS --> PSI
+    DS --> DSI
+    TS --> TSI
+    AS --> ASI
+    PSI --> PR & AR
+    DSI --> DR & AR
+    TSI --> TR & PR & DR & AR
+    ASI --> AR
+    PR --> POSTGRES & PE
+    DR --> POSTGRES & DE
+    TR --> POSTGRES & TE
+    AR --> MONGO & AE
+    PE --> TE
+    DE --> TE
+    PSI -.-> CACHE
+    DSI -.-> CACHE
+    TSI -.-> CACHE & PSI & DSI
+    PROJSTATUS --> PE
+    TASKSTATUS --> TE
+    PRIORITY --> TE
+    ACTION --> AE
+    DBCONFIG -.-> PR & DR & TR
+    MONGOCONFIG -.-> AR
+    CACHECONFIG -.-> CACHE
+    SWAGGERCONFIG -.-> SWAGGER & OPENAPI
+    LOG -.-> PC & DC & TC & AC & PSI & DSI & TSI & ASI
+    VAL -.-> PC & DC & TC & AC & PE & DE & TE
+    EVENTS -.-> ASI
+    EXCEPTIONS -.-> EH
+     CLIENT:::external
+     POSTGRES:::database
+     MONGO:::database
+     CACHE:::cache
+     PC:::controller
+     DC:::controller
+     TC:::controller
+     AC:::controller
+     EH:::controller
+     PS:::service
+     DS:::service
+     TS:::service
+     AS:::service
+     PSI:::service
+     DSI:::service
+     TSI:::service
+     ASI:::service
+     PR:::repository
+     DR:::repository
+     TR:::repository
+     AR:::repository
+     PE:::entity
+     DE:::entity
+     TE:::entity
+     AE:::entity
+     PDTO:::dto
+     DDTO:::dto
+     TDTO:::dto
+     ADTO:::dto
+     PAGE:::dto
+     PROJSTATUS:::enum
+     TASKSTATUS:::enum
+     PRIORITY:::enum
+     ACTION:::enum
+     DBCONFIG:::config
+     MONGOCONFIG:::config
+     CACHECONFIG:::config
+     SWAGGERCONFIG:::config
+     LOG:::crosscut
+     VAL:::crosscut
+     EVENTS:::crosscut
+     EXCEPTIONS:::crosscut
+     SWAGGER:::external
+     OPENAPI:::external
+    classDef controller fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef repository fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef entity fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef dto fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef enum fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+    classDef config fill:#fff8e1,stroke:#ff8f00,stroke-width:2px
+    classDef database fill:#e3f2fd,stroke:#0d47a1,stroke-width:3px
+    classDef cache fill:#f9fbe7,stroke:#827717,stroke-width:2px
+    classDef external fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+    classDef crosscut fill:#e0f2f1,stroke:#00695c,stroke-width:2px

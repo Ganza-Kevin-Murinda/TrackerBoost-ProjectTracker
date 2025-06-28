@@ -1,0 +1,41 @@
+sequenceDiagram
+    participant Client
+    participant AuthController
+    participant AuthenticationManager
+    participant UserService
+    participant JwtUtil
+    participant DB
+
+    Note over Client: 🔐 Local Login with Username/Password
+
+    Client->>+AuthController: POST /auth/login (username, password)
+    AuthController->>+AuthenticationManager: authenticate(username, password)
+    AuthenticationManager->>+UserService: loadUserByUsername()
+    UserService->>DB: Fetch user from DB
+    DB-->>UserService: UserDetails
+    UserService-->>AuthenticationManager: UserDetails
+    AuthenticationManager-->>AuthController: Authenticated User
+    AuthController->>+JwtUtil: generateToken(username)
+    JwtUtil-->>AuthController: JWT Token
+    AuthController-->>Client: 200 OK + JWT (Bearer token)
+
+    Note over Client: 🔐 OAuth2 Login (Google)
+
+    Client->>+Spring Security: GET /oauth2/authorization/google
+    Spring Security->>Google: Redirect to Google OAuth login
+    Google-->>Client: Redirect back with Auth Code
+    Client->>+Spring Security: GET /login/oauth2/code/google?code=abc
+    Spring Security->>+CustomOAuth2UserService: loadUser()
+    CustomOAuth2UserService->>Google: Get user info (id, email, name)
+    CustomOAuth2UserService->>+UserService: registerOAuth2User()
+    UserService->>DB: Find or Create user
+    DB-->>UserService: User
+    UserService-->>CustomOAuth2UserService: UserDetails
+    CustomOAuth2UserService-->>Spring Security: OAuth2User
+    Spring Security->>+OAuth2SuccessHandler: onAuthenticationSuccess()
+    OAuth2SuccessHandler->>+JwtUtil: generateToken(email)
+    JwtUtil-->>OAuth2SuccessHandler: JWT Token
+    OAuth2SuccessHandler-->>Client: Redirect or JSON with JWT
+
+    Note over Client, DB: Client uses JWT for authorized API requests
+
