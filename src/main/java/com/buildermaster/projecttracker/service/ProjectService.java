@@ -24,8 +24,6 @@ public interface ProjectService {
 
     ProjectResponseDTO getProjectById(UUID id);
 
-    List<ProjectResponseDTO> getAllProjects();
-
     Page<ProjectSummaryDTO> getAllProjects(Pageable pageable);
 
     ProjectResponseDTO updateProject(UUID id, UpdateProjectRequestDTO updateRequest);
@@ -47,10 +45,6 @@ public interface ProjectService {
     Page<ProjectSummaryDTO> searchProjectsByName(String name, Pageable pageable);
 
     Page<ProjectSummaryDTO> searchProjectsByDescription(String description, Pageable pageable);
-
-    Page<ProjectSummaryDTO> getProjectsWithDeadlineBefore(LocalDate date, Pageable pageable);
-
-    Page<ProjectSummaryDTO> getProjectsWithDeadlineAfter(LocalDate date, Pageable pageable);
 
     Page<ProjectSummaryDTO> getRecentlyCreatedProjects(Pageable pageable);
 

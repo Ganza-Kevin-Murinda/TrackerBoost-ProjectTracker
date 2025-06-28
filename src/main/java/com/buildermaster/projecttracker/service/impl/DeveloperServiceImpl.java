@@ -94,20 +94,6 @@ public class DeveloperServiceImpl implements DeveloperService {
     }
 
     @Override
-    @Cacheable(value = "allDevelopers")
-    @Transactional(readOnly = true)
-    public List<DeveloperResponseDTO> getAllDevelopers() {
-        log.debug("Retrieving all developers");
-
-        List<Developer> developers = developerRepository.findAll();
-        log.debug("Found {} developers", developers.size());
-
-        return developers.stream()
-                .map(this::mapToResponseDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public Page<DeveloperResponseDTO> getAllDevelopers(Pageable pageable) {
         log.debug("Retrieving developers with pagination: page {}, size {}",
@@ -287,18 +273,6 @@ public class DeveloperServiceImpl implements DeveloperService {
     }
 
     // ===== UTILITY METHODS =====
-
-    @Override
-    @Transactional(readOnly = true)
-    public boolean existsByEmail(String email) {
-        log.debug("Checking if developer exists with email: {}", email);
-
-        if (!StringUtils.hasText(email)) {
-            return false;
-        }
-
-        return developerRepository.existsByEmail(email);
-    }
 
     @Override
     @Transactional(readOnly = true)

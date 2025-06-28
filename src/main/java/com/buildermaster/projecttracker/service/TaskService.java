@@ -28,8 +28,6 @@ public interface TaskService {
 
     TaskResponseDTO getTaskById(UUID taskId);
 
-    List<TaskResponseDTO> getAllTasks();
-
     Page<TaskResponseDTO> getAllTasks(Pageable pageable);
 
     TaskResponseDTO updateTask(UUID taskId, UpdateTaskRequestDTO updateTaskRequest);

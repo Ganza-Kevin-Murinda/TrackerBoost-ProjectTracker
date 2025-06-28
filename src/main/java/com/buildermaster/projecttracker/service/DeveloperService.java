@@ -23,8 +23,6 @@ public interface DeveloperService {
 
     DeveloperResponseDTO getDeveloperById(UUID developerId);
 
-    List<DeveloperResponseDTO> getAllDevelopers();
-
     Page<DeveloperResponseDTO> getAllDevelopers(Pageable pageable);
 
     DeveloperResponseDTO updateDeveloperProfile(UUID developerId, UpdateDeveloperRequestDTO updateRequest);
@@ -46,8 +44,6 @@ public interface DeveloperService {
     Page<DeveloperResponseDTO> searchDevelopersBySkill(String skill, Pageable pageable);
 
     // ===== UTILITY METHODS =====
-
-    boolean existsByEmail(String email);
 
     Long getTotalDeveloperCount();
 

@@ -99,17 +99,6 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    @Cacheable(value = "tasks", key = "'all'")
-    public List<TaskResponseDTO> getAllTasks() {
-        log.debug("Fetching all tasks");
-
-        List<Task> tasks = taskRepository.findAll();
-        return tasks.stream()
-                .map(this::convertToResponseDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
     @Cacheable(value = "tasks", key = "'all_paginated_' + #pageable.pageNumber + '_' + #pageable.pageSize")
     public Page<TaskResponseDTO> getAllTasks(Pageable pageable) {
         log.debug("Fetching all tasks with pagination - page: {}, size: {}",

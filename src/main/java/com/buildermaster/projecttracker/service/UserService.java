@@ -13,8 +13,6 @@ import java.util.UUID;
 
 public interface UserService extends UserDetailsService {
 
-    Optional<User> getUserByUsername(String email);
-
     List<UserResponseDTO> getAllUsers();
 
     User createUser(User user); // for local registration

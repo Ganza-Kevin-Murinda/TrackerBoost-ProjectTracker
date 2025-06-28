@@ -85,20 +85,6 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    @Cacheable(value = "allProjects")
-    @Transactional(readOnly = true)
-    public List<ProjectResponseDTO> getAllProjects() {
-        log.debug("Fetching all projects");
-
-        List<Project> projects = projectRepository.findAll();
-        log.debug("Found {} Projects", projects.size());
-
-        return projects.stream()
-                .map(this::mapToResponseDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public Page<ProjectSummaryDTO> getAllProjects(Pageable pageable) {
         log.debug("Fetching all projects with pagination: page={}, size={}",
@@ -263,34 +249,6 @@ public class ProjectServiceImpl implements ProjectService {
         Page<Project> projectPage = projectRepository.findByDescriptionContainingIgnoreCase(description, pageable);
         log.debug("Found {} projects matching description search '{}' on page {} of {}",
                 projectPage.getContent().size(), description,
-                projectPage.getNumber() + 1, projectPage.getTotalPages());
-
-        return projectPage.map(this::mapToSummaryDTO);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProjectSummaryDTO> getProjectsWithDeadlineBefore(LocalDate date, Pageable pageable) {
-        log.debug("Fetching projects with deadline before: {} with pagination: page={}, size={}",
-                date, pageable.getPageNumber(), pageable.getPageSize());
-
-        Page<Project> projectPage = projectRepository.findByDeadlineBefore(date, pageable);
-        log.debug("Found {} projects with deadline before {} on page {} of {}",
-                projectPage.getContent().size(), date,
-                projectPage.getNumber() + 1, projectPage.getTotalPages());
-
-        return projectPage.map(this::mapToSummaryDTO);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProjectSummaryDTO> getProjectsWithDeadlineAfter(LocalDate date, Pageable pageable) {
-        log.debug("Fetching projects with deadline after: {} with pagination: page={}, size={}",
-                date, pageable.getPageNumber(), pageable.getPageSize());
-
-        Page<Project> projectPage = projectRepository.findByDeadlineAfter(date, pageable);
-        log.debug("Found {} projects with deadline after {} on page {} of {}",
-                projectPage.getContent().size(), date,
                 projectPage.getNumber() + 1, projectPage.getTotalPages());
 
         return projectPage.map(this::mapToSummaryDTO);
