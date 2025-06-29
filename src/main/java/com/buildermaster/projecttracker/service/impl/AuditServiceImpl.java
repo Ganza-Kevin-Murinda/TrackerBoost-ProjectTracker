@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -50,10 +49,6 @@ public class AuditServiceImpl implements AuditService {
             AuditLog savedLog = auditLogRepository.save(auditLog);
             log.info("Audit log created: {} action on {} entity {} by {}",
                     actionType, entityType, entityId, actor);
-
-            // Publish audit event asynchronously
-            publishAuditEvent(savedLog);
-
             return savedLog;
         } catch (Exception e) {
             log.error("Failed to create audit log for {} action on {} entity {} by {}: {}",
@@ -145,12 +140,6 @@ public class AuditServiceImpl implements AuditService {
         }
     }
 
-    /**
-     * Create audit payload from entity object
-     * Serializes the entity to a Map for storage in MongoDB
-     * @param entity the entity object
-     * @return Map representation of the entity
-     */
     private Map<String, Object> createAuditPayload(Object entity) {
         if (entity == null) {
             return new HashMap<>();
@@ -180,24 +169,6 @@ public class AuditServiceImpl implements AuditService {
     }
 
     /**
-     * Publish audit event asynchronously
-     * This can be extended to integrate with messaging systems or event buses
-     * @param auditLog the audit log to publish
-     */
-    @Async
-    protected void publishAuditEvent(AuditLog auditLog) {
-        try {
-            log.debug("Publishing audit event for {} action on {} entity {} by {}",
-                    auditLog.getActionType(), auditLog.getEntityType(),
-                    auditLog.getEntityId(), auditLog.getActorName());
-            log.info("Audit event published successfully: {}", auditLog.getId());
-        } catch (Exception e) {
-            log.error("Failed to publish audit event for log {}: {}",
-                    auditLog.getId(), e.getMessage(), e);
-        }
-    }
-
-    /**
      * Convert AuditLog entity to AuditLogResponseDTO
      * @param auditLog the audit log entity
      * @return response DTO with formatted data
@@ -223,7 +194,6 @@ public class AuditServiceImpl implements AuditService {
      * @return formatted action description
      */
     private String generateActionDescription(AuditLog auditLog) {
-        String action = auditLog.getActionType().name().toLowerCase();
         String entity = auditLog.getEntityType().toLowerCase();
 
         return switch (auditLog.getActionType()) {

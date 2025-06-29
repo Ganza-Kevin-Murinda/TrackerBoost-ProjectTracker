@@ -7,6 +7,7 @@ import com.buildermaster.projecttracker.dto.response.TaskStatsDTO;
 import com.buildermaster.projecttracker.dto.response.TaskSummaryDTO;
 import com.buildermaster.projecttracker.exception.ResourceNotFoundException;
 import com.buildermaster.projecttracker.exception.ValidationException;
+import com.buildermaster.projecttracker.mapper.TaskMapper;
 import com.buildermaster.projecttracker.model.*;
 import com.buildermaster.projecttracker.model.EActionType;
 import com.buildermaster.projecttracker.repository.DeveloperRepository;
@@ -17,6 +18,7 @@ import com.buildermaster.projecttracker.service.TaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -43,6 +45,8 @@ public class TaskServiceImpl implements TaskService {
     private final ProjectRepository projectRepository;
     private final DeveloperRepository developerRepository;
     private final AuditService auditService;
+    private final TaskMapper taskMapper;
+    private final MetricsService metricsService;
 
     // ===== CRUD OPERATIONS =====
 
@@ -50,7 +54,9 @@ public class TaskServiceImpl implements TaskService {
     @Transactional
     @CacheEvict(value = {"tasks", "taskStats", "taskSummaries"}, allEntries = true)
     public TaskResponseDTO createTask(CreateTaskRequestDTO createTaskRequest) {
-        log.info("Creating new task with title: {}", createTaskRequest.getTitle());
+        long startTime = System.currentTimeMillis();
+        try {
+            log.info("Creating new task with title: {}", createTaskRequest.getTitle());
 
         // Validate project exists
         Project project = projectRepository.findById(createTaskRequest.getProjectId())
@@ -84,18 +90,31 @@ public class TaskServiceImpl implements TaskService {
         // Log audit
         auditService.logAction(EActionType.CREATE, "Task", savedTask.getId(), "SYSTEM", savedTask);
 
-        return convertToResponseDTO(savedTask);
+        metricsService.incrementTasksCreated();
+
+        return taskMapper.toResponseDTO(savedTask);
+        } finally {
+            metricsService.recordTaskProcessingTime(System.currentTimeMillis() - startTime);
+        }
     }
 
     @Override
     @Cacheable(value = "tasks", key = "#taskId")
     public TaskResponseDTO getTaskById(UUID taskId) {
+        long startTime = System.currentTimeMillis();
+        try {
+        log.info("Cache MISS - Fetching task from database with ID: {}", taskId);
         log.debug("Fetching task with ID: {}", taskId);
 
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", taskId));
 
-        return convertToResponseDTO(task);
+        metricsService.incrementTasksRetrieved();
+
+        return taskMapper.toResponseDTO(task);
+        } finally {
+            metricsService.recordTaskProcessingTime(System.currentTimeMillis() - startTime);
+        }
     }
 
     @Override
@@ -105,13 +124,15 @@ public class TaskServiceImpl implements TaskService {
                 pageable.getPageNumber(), pageable.getPageSize());
 
         Page<Task> taskPage = taskRepository.findAll(pageable);
-        return taskPage.map(this::convertToResponseDTO);
+        return taskPage.map(taskMapper::toResponseDTO);
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = {"tasks", "taskStats", "taskSummaries"}, allEntries = true)
+    @CachePut(value = "tasks", key = "#taskId")
     public TaskResponseDTO updateTask(UUID taskId, UpdateTaskRequestDTO updateTaskRequest) {
+        long startTime = System.currentTimeMillis();
+        try {
         log.info("Updating task with ID: {}", taskId);
 
         // Fetch existing task
@@ -147,13 +168,20 @@ public class TaskServiceImpl implements TaskService {
         // Log audit
         auditService.logAction(EActionType.UPDATE, "Task", updatedTask.getId(), "SYSTEM", updatedTask);
 
-        return convertToResponseDTO(updatedTask);
+        metricsService.incrementTasksUpdated();
+
+        return taskMapper.toResponseDTO(updatedTask);
+        } finally {
+            metricsService.recordTaskProcessingTime(System.currentTimeMillis() - startTime);
+        }
     }
 
     @Override
     @Transactional
     @CacheEvict(value = {"tasks", "taskStats", "taskSummaries"}, allEntries = true)
     public boolean deleteTask(UUID taskId) {
+        long startTime = System.currentTimeMillis();
+        try {
         log.info("Deleting task with ID: {}", taskId);
 
         Task task = taskRepository.findById(taskId)
@@ -162,7 +190,7 @@ public class TaskServiceImpl implements TaskService {
         if(task != null) {
             taskRepository.delete(task);
             log.info("Successfully deleted task with ID: {}", taskId);
-
+            metricsService.incrementTasksDeleted();
             // Log audit
             auditService.logAction(EActionType.DELETE, "Task", taskId, "SYSTEM", task);
 
@@ -170,6 +198,9 @@ public class TaskServiceImpl implements TaskService {
         }
 
         return false;
+        } finally {
+            metricsService.recordTaskProcessingTime(System.currentTimeMillis() - startTime);
+        }
     }
 
     // ===== BUSINESS OPERATIONS =====
@@ -180,7 +211,7 @@ public class TaskServiceImpl implements TaskService {
 
         validateProjectExists(projectId);
         Page<Task> taskPage = taskRepository.findByProjectId(projectId, pageable);
-        return taskPage.map(this::convertToResponseDTO);
+        return taskPage.map(taskMapper::toResponseDTO);
     }
 
     @Override
@@ -189,7 +220,7 @@ public class TaskServiceImpl implements TaskService {
 
         validateDeveloperExists(developerId);
         Page<Task> taskPage = taskRepository.findByDeveloperId(developerId, pageable);
-        return taskPage.map(this::convertToResponseDTO);
+        return taskPage.map(taskMapper::toResponseDTO);
     }
 
     @Override
@@ -197,7 +228,7 @@ public class TaskServiceImpl implements TaskService {
         log.debug("Fetching tasks with status: {} with pagination", status);
 
         Page<Task> taskPage = taskRepository.findByStatus(status, pageable);
-        return taskPage.map(this::convertToResponseDTO);
+        return taskPage.map(taskMapper::toResponseDTO);
     }
 
     @Override
@@ -205,7 +236,7 @@ public class TaskServiceImpl implements TaskService {
         log.debug("Fetching overdue tasks with pagination");
 
         Page<Task> taskPage = taskRepository.findByDueDateBefore(LocalDate.now(), pageable);
-        return taskPage.map(this::convertToResponseDTO);
+        return taskPage.map(taskMapper::toResponseDTO);
     }
 
     @Override
@@ -218,7 +249,7 @@ public class TaskServiceImpl implements TaskService {
 
         List<TaskResponseDTO> pageContent = unassignedTasks.subList(start, end)
                 .stream()
-                .map(this::convertToResponseDTO)
+                .map(taskMapper::toResponseDTO)
                 .collect(Collectors.toList());
 
         return new PageImpl<>(pageContent, pageable, unassignedTasks.size());
@@ -228,6 +259,8 @@ public class TaskServiceImpl implements TaskService {
     @Transactional
     @CacheEvict(value = {"tasks", "taskStats", "taskSummaries"}, allEntries = true)
     public TaskResponseDTO assignTaskToDeveloper(UUID taskId, UUID developerId) {
+        long startTime = System.currentTimeMillis();
+        try {
         log.info("Assigning task {} to developer {}", taskId, developerId);
 
         Task task = taskRepository.findById(taskId)
@@ -245,13 +278,19 @@ public class TaskServiceImpl implements TaskService {
         auditService.logAction(EActionType.UPDATE, "Task", taskId, "SYSTEM",
                 Map.of("action", "assigned", "developerId", developerId));
 
-        return convertToResponseDTO(updatedTask);
+        metricsService.incrementTasksAssigned();
+        return taskMapper.toResponseDTO(updatedTask);
+        } finally {
+            metricsService.recordTaskProcessingTime(System.currentTimeMillis() - startTime);
+        }
     }
 
     @Override
     @Transactional
     @CacheEvict(value = {"tasks", "taskStats", "taskSummaries"}, allEntries = true)
     public TaskResponseDTO unassignTask(UUID taskId) {
+        long startTime = System.currentTimeMillis();
+        try {
         log.info("Unassigning task {}", taskId);
 
         Task task = taskRepository.findById(taskId)
@@ -266,7 +305,11 @@ public class TaskServiceImpl implements TaskService {
         auditService.logAction(EActionType.UPDATE, "Task", taskId, "SYSTEM",
                 Map.of("action", "unassigned"));
 
-        return convertToResponseDTO(updatedTask);
+        metricsService.incrementTasksUnassigned();
+        return taskMapper.toResponseDTO(updatedTask);
+        } finally {
+            metricsService.recordTaskProcessingTime(System.currentTimeMillis() - startTime);
+        }
     }
 
     @Override
@@ -274,7 +317,7 @@ public class TaskServiceImpl implements TaskService {
         log.debug("Searching tasks by title: {}", title);
 
         Page<Task> taskPage = taskRepository.findByTitleContainingIgnoreCase(title, pageable);
-        return taskPage.map(this::convertToResponseDTO);
+        return taskPage.map(taskMapper::toResponseDTO);
     }
 
     @Override
@@ -282,7 +325,7 @@ public class TaskServiceImpl implements TaskService {
         log.debug("Searching tasks by description: {}", description);
 
         Page<Task> taskPage = taskRepository.findByDescriptionContainingIgnoreCase(description, pageable);
-        return taskPage.map(this::convertToResponseDTO);
+        return taskPage.map(taskMapper::toResponseDTO);
     }
 
     @Override
@@ -291,7 +334,7 @@ public class TaskServiceImpl implements TaskService {
 
         validateDateRange(startDate, endDate);
         Page<Task> taskPage = taskRepository.findByDueDateBetween(startDate, endDate, pageable);
-        return taskPage.map(this::convertToResponseDTO);
+        return taskPage.map(taskMapper::toResponseDTO);
     }
 
     @Override
@@ -300,7 +343,7 @@ public class TaskServiceImpl implements TaskService {
 
         List<Task> tasks = taskRepository.findTasksDueToday();
         return tasks.stream()
-                .map(this::convertToResponseDTO)
+                .map(taskMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -313,7 +356,7 @@ public class TaskServiceImpl implements TaskService {
 
         List<Task> tasks = taskRepository.findTasksDueThisWeek(now, nextWeek);
         return tasks.stream()
-                .map(this::convertToResponseDTO)
+                .map(taskMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -323,7 +366,7 @@ public class TaskServiceImpl implements TaskService {
 
         List<Task> tasks = taskRepository.findRecentlyCreatedTasks(sinceDate);
         return tasks.stream()
-                .map(this::convertToResponseDTO)
+                .map(taskMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -333,7 +376,7 @@ public class TaskServiceImpl implements TaskService {
 
         List<Task> tasks = taskRepository.findRecentlyUpdatedTasks(sinceDate);
         return tasks.stream()
-                .map(this::convertToResponseDTO)
+                .map(taskMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -359,6 +402,9 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Cacheable(value = "taskStats", key = "'general'")
     public TaskStatsDTO getTaskStatistics() {
+        long startTime = System.currentTimeMillis();
+        try {
+
         log.debug("Fetching general task statistics");
 
         long totalTasks = taskRepository.count();
@@ -371,12 +417,18 @@ public class TaskServiceImpl implements TaskService {
                         Map.Entry::getValue
                 ));
 
+        metricsService.recordTaskStatisticsGenerated();
+
         return TaskStatsDTO.builder()
                 .totalTasks(totalTasks)
                 .tasksByStatus(tasksByStatus)
                 .overdueTasks(overdueTasks)
                 .unassignedTasks(unassignedTasks)
                 .build();
+
+        } finally {
+            metricsService.recordTaskProcessingTime(System.currentTimeMillis() - startTime);
+        }
     }
 
     @Override
@@ -385,35 +437,7 @@ public class TaskServiceImpl implements TaskService {
 
         validateProjectExists(projectId);
         List<Object[]> resultList = taskRepository.getTaskStatisticsByProject(projectId);
-        if (resultList == null || resultList.isEmpty()) {
-            log.warn("No task statistics found for project: {}", projectId);
-            return TaskStatsDTO.builder().totalTasks(0L).tasksByStatus(Map.of()).build();
-        }
-
-        Object[] result = resultList.getFirst();
-        return getTaskStats(result);
-
-    }
-
-    private TaskStatsDTO getTaskStats(Object[] result) {
-        long total = ((Number) result[0]).longValue();
-        long completed = ((Number) result[1]).longValue();
-        long toDo = ((Number) result[2]).longValue();
-        long inProgress = ((Number) result[3]).longValue();
-        long blocked = ((Number) result[4]).longValue();
-
-        Map<String, Long> tasksByStatus = Map.of(
-                "TOTAL", total,
-                "COMPLETED", completed,
-                "TODO", toDo,
-                "IN_PROGRESS", inProgress,
-                "BLOCKED", blocked
-        );
-
-        return TaskStatsDTO.builder()
-                .totalTasks(total)
-                .tasksByStatus(tasksByStatus)
-                .build();
+        return taskMapper.toStatsDTO(resultList);
     }
 
     @Override
@@ -422,14 +446,7 @@ public class TaskServiceImpl implements TaskService {
 
         validateDeveloperExists(developerId);
         List<Object[]> resultList = taskRepository.getTaskStatisticsByDeveloper(developerId);
-
-        if (resultList == null || resultList.isEmpty()) {
-            log.warn("No task statistics found for developer: {}", developerId);
-            return TaskStatsDTO.builder().totalTasks(0L).tasksByStatus(Map.of()).build();
-        }
-
-        Object[] result = resultList.getFirst();
-        return getTaskStats(result);
+        return taskMapper.toStatsDTO(resultList);
     }
 
     @Override
@@ -456,7 +473,7 @@ public class TaskServiceImpl implements TaskService {
 
         validateProjectExists(projectId);
         Page<Task> taskPage = taskRepository.findByProjectId(projectId, pageable);
-        return taskPage.map(this::convertToSummaryDTO);
+        return taskPage.map(taskMapper::toSummaryDTO);
     }
 
     @Override
@@ -465,7 +482,7 @@ public class TaskServiceImpl implements TaskService {
 
         validateDeveloperExists(developerId);
         Page<Task> taskPage = taskRepository.findByDeveloperId(developerId, pageable);
-        return taskPage.map(this::convertToSummaryDTO);
+        return taskPage.map(taskMapper::toSummaryDTO);
     }
 
     @Override
@@ -473,64 +490,11 @@ public class TaskServiceImpl implements TaskService {
         log.debug("Fetching task summaries for status: {}", status);
 
         Page<Task> taskPage = taskRepository.findByStatus(status, pageable);
-        return taskPage.map(this::convertToSummaryDTO);
+        return taskPage.map(taskMapper::toSummaryDTO);
     }
 
     // ===== HELPER METHODS =====
 
-    private TaskResponseDTO convertToResponseDTO(Task task) {
-        if (task == null) {
-            return null;
-        }
-
-        LocalDate today = LocalDate.now();
-        boolean isOverdue = task.getDueDate().isBefore(today) &&
-                !task.getStatus().equals(ETaskStatus.COMPLETED);
-
-        long daysRemaining = 0;
-        long daysOverdue = 0;
-
-        if (isOverdue) {
-            daysOverdue = today.toEpochDay() - task.getDueDate().toEpochDay();
-        } else {
-            daysRemaining = task.getDueDate().toEpochDay() - today.toEpochDay();
-        }
-
-        return TaskResponseDTO.builder()
-                .id(task.getId())
-                .title(task.getTitle())
-                .description(task.getDescription())
-                .status(task.getStatus())
-                .dueDate(task.getDueDate())
-                .isOverdue(isOverdue)
-                .daysRemaining(daysRemaining)
-                .daysOverdue(daysOverdue)
-                .projectName(task.getProject() != null ? task.getProject().getName() : null)
-                .developerName(task.getDeveloper() != null ? task.getDeveloper().getName() : null)
-                .createdDate(task.getCreatedDate())
-                .updatedDate(task.getUpdatedDate())
-                .build();
-    }
-
-    private TaskSummaryDTO convertToSummaryDTO(Task task) {
-        if (task == null) {
-            return null;
-        }
-
-        LocalDate today = LocalDate.now();
-        boolean isOverdue = task.getDueDate().isBefore(today) &&
-                !task.getStatus().equals(ETaskStatus.COMPLETED);
-
-        return TaskSummaryDTO.builder()
-                .id(task.getId())
-                .title(task.getTitle())
-                .status(task.getStatus())
-                .dueDate(task.getDueDate())
-                .isOverdue(isOverdue)
-                .projectName(task.getProject() != null ? task.getProject().getName() : null)
-                .developerName(task.getDeveloper() != null ? task.getDeveloper().getName() : null)
-                .build();
-    }
 
     private void validateProjectExists(UUID projectId) {
         if (!projectRepository.existsById(projectId)) {
