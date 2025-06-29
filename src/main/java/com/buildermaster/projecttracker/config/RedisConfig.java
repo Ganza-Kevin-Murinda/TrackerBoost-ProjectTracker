@@ -1,6 +1,7 @@
 package com.buildermaster.projecttracker.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.time.Duration;
 
@@ -25,15 +27,33 @@ import java.util.Map;
 @Slf4j
 public class RedisConfig {
 
+    // Create a Redis-specific ObjectMapper
+    private ObjectMapper createRedisObjectMapper() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+        // Simplified type validation - avoid complex Spring Data types
+        objectMapper.activateDefaultTyping(
+                BasicPolymorphicTypeValidator.builder()
+                        .allowIfSubType("com.buildermaster.projecttracker")
+                        .allowIfSubType("java.util.List")
+                        .allowIfSubType("java.util.ArrayList")
+                        .allowIfSubType("java.util.LinkedList")
+                        .allowIfSubType("java.time")
+                        .allowIfSubType("java.lang")
+                        .allowIfSubType("java.math")
+                        .build(),
+                ObjectMapper.DefaultTyping.NON_FINAL
+        );
+
+        return objectMapper;
+    }
 
     @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-        ObjectMapper objectMapper = new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-
+    public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
         GenericJackson2JsonRedisSerializer jsonSerializer =
-                new GenericJackson2JsonRedisSerializer(objectMapper);
+                new GenericJackson2JsonRedisSerializer(createRedisObjectMapper());
 
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofMinutes(30))
@@ -50,6 +70,7 @@ public class RedisConfig {
         cacheConfigurations.put("tasks", defaultConfig.entryTtl(Duration.ofMinutes(30)));
         cacheConfigurations.put("taskStats", defaultConfig.entryTtl(Duration.ofMinutes(15)));
         cacheConfigurations.put("developers", defaultConfig.entryTtl(Duration.ofMinutes(60)));
+        // Note: Don't cache pageable results directly - cache the underlying data instead
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
@@ -59,12 +80,8 @@ public class RedisConfig {
 
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
-        ObjectMapper objectMapper = new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-
         GenericJackson2JsonRedisSerializer jsonSerializer =
-                new GenericJackson2JsonRedisSerializer(objectMapper);
+                new GenericJackson2JsonRedisSerializer(createRedisObjectMapper());
 
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
