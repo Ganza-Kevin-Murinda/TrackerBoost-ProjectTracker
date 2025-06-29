@@ -6,9 +6,9 @@ import com.buildermaster.projecttracker.dto.response.ProjectResponseDTO;
 import com.buildermaster.projecttracker.dto.response.ProjectSummaryDTO;
 import com.buildermaster.projecttracker.exception.ResourceNotFoundException;
 import com.buildermaster.projecttracker.exception.ValidationException;
+import com.buildermaster.projecttracker.mapper.ProjectMapper;
 import com.buildermaster.projecttracker.model.EActionType;
 import com.buildermaster.projecttracker.model.EProjectStatus;
-import com.buildermaster.projecttracker.model.ETaskStatus;
 import com.buildermaster.projecttracker.model.Project;
 import com.buildermaster.projecttracker.repository.ProjectRepository;
 import com.buildermaster.projecttracker.service.AuditService;
@@ -16,6 +16,7 @@ import com.buildermaster.projecttracker.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -39,6 +40,7 @@ public class ProjectServiceImpl implements ProjectService {
 
     private final ProjectRepository projectRepository;
     private final AuditService auditService;
+    private final ProjectMapper projectMapper;
 
     private static final String SYSTEM_ACTOR = "SYSTEM";
 
@@ -66,7 +68,7 @@ public class ProjectServiceImpl implements ProjectService {
         // Log audit
         auditService.logAction(EActionType.CREATE, "Project", savedProject.getId(), SYSTEM_ACTOR , savedProject);
 
-        return mapToResponseDTO(savedProject);
+        return projectMapper.toResponseDTO(savedProject);
     }
 
     @Override
@@ -81,7 +83,7 @@ public class ProjectServiceImpl implements ProjectService {
                     return new ResourceNotFoundException("Project", id);
                 });
 
-        return mapToResponseDTO(project);
+        return projectMapper.toResponseDTO(project);
     }
 
     @Override
@@ -96,11 +98,11 @@ public class ProjectServiceImpl implements ProjectService {
                 projectPage.getNumber() + 1,
                 projectPage.getTotalPages());
 
-        return projectPage.map(this::mapToSummaryDTO);
+        return projectPage.map(projectMapper::toSummaryDTO);
     }
 
     @Override
-    @CacheEvict(value = {"projects", "allProjects"}, allEntries = true)
+    @CachePut(value = "projects", key = "#id")
     public ProjectResponseDTO updateProject(UUID id, UpdateProjectRequestDTO updateRequest) {
         log.info("Updating project with ID: {}", id);
 
@@ -126,7 +128,7 @@ public class ProjectServiceImpl implements ProjectService {
         // Log audit
         auditService.logAction(EActionType.UPDATE, "Project", updatedProject.getId(), SYSTEM_ACTOR , updatedProject);
 
-        return mapToResponseDTO(updatedProject);
+        return projectMapper.toResponseDTO(updatedProject);
     }
 
     @Override
@@ -165,7 +167,7 @@ public class ProjectServiceImpl implements ProjectService {
                 projectPage.getContent().size(), status,
                 projectPage.getNumber() + 1, projectPage.getTotalPages());
 
-        return projectPage.map(this::mapToSummaryDTO);
+        return projectPage.map(projectMapper::toSummaryDTO);
     }
 
     @Override
@@ -177,7 +179,7 @@ public class ProjectServiceImpl implements ProjectService {
         log.debug("Found {} overdue projects", overdueProjects.size());
 
         return overdueProjects.stream()
-                .map(this::mapToResponseDTO)
+                .map(projectMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -190,7 +192,7 @@ public class ProjectServiceImpl implements ProjectService {
         log.debug("Found {} projects without tasks", projectsWithoutTasks.size());
 
         return projectsWithoutTasks.stream()
-                .map(this::mapToResponseDTO)
+                .map(projectMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -206,7 +208,7 @@ public class ProjectServiceImpl implements ProjectService {
                 projectPage.getNumber() + 1,
                 projectPage.getTotalPages());
 
-        return projectPage.map(this::mapToSummaryDTO);
+        return projectPage.map(projectMapper::toSummaryDTO);
     }
 
     @Override
@@ -222,7 +224,7 @@ public class ProjectServiceImpl implements ProjectService {
         log.debug("Found {} projects with deadlines between {} and {}", projects.size(), startDate, endDate);
 
         return projects.stream()
-                .map(this::mapToResponseDTO)
+                .map(projectMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -237,7 +239,7 @@ public class ProjectServiceImpl implements ProjectService {
                 projectPage.getContent().size(), name,
                 projectPage.getNumber() + 1, projectPage.getTotalPages());
 
-        return projectPage.map(this::mapToSummaryDTO);
+        return projectPage.map(projectMapper::toSummaryDTO);
     }
 
     @Override
@@ -251,7 +253,7 @@ public class ProjectServiceImpl implements ProjectService {
                 projectPage.getContent().size(), description,
                 projectPage.getNumber() + 1, projectPage.getTotalPages());
 
-        return projectPage.map(this::mapToSummaryDTO);
+        return projectPage.map(projectMapper::toSummaryDTO);
     }
 
     @Override
@@ -266,7 +268,7 @@ public class ProjectServiceImpl implements ProjectService {
                 projectPage.getNumber() + 1,
                 projectPage.getTotalPages());
 
-        return projectPage.map(this::mapToSummaryDTO);
+        return projectPage.map(projectMapper::toSummaryDTO);
     }
 
     @Override
@@ -281,7 +283,7 @@ public class ProjectServiceImpl implements ProjectService {
                 projectPage.getNumber() + 1,
                 projectPage.getTotalPages());
 
-        return projectPage.map(this::mapToSummaryDTO);
+        return projectPage.map(projectMapper::toSummaryDTO);
     }
 
     // ===== UTILITY METHODS =====
@@ -334,49 +336,4 @@ public class ProjectServiceImpl implements ProjectService {
         }
     }
 
-    private ProjectResponseDTO mapToResponseDTO(Project project) {
-        int taskCount = project.getTasks().size();
-        int completedTaskCount = (int) project.getTasks().stream()
-                .filter(task -> task.getStatus() == ETaskStatus.COMPLETED)
-                .count();
-        double completionPercentage = taskCount > 0 ?
-                (double) completedTaskCount / taskCount * 100.0 : 0.0;
-        boolean isOverdue = project.getDeadline().isBefore(LocalDate.now()) &&
-                project.getStatus() != EProjectStatus.COMPLETED;
-
-        return ProjectResponseDTO.builder()
-                .id(project.getId())
-                .name(project.getName())
-                .description(project.getDescription())
-                .deadline(project.getDeadline())
-                .status(project.getStatus())
-                .taskCount(taskCount)
-                .completedTaskCount(completedTaskCount)
-                .completionPercentage(Math.round(completionPercentage * 100.0) / 100.0)
-                .isOverdue(isOverdue)
-                .createdDate(project.getCreatedDate())
-                .updatedDate(project.getUpdatedDate())
-                .build();
-    }
-
-    private ProjectSummaryDTO mapToSummaryDTO(Project project) {
-        int taskCount = project.getTasks().size();
-        int completedTaskCount = (int) project.getTasks().stream()
-                .filter(task -> task.getStatus() == ETaskStatus.COMPLETED)
-                .count();
-        double completionPercentage = taskCount > 0 ?
-                (double) completedTaskCount / taskCount * 100.0 : 0.0;
-        boolean isOverdue = project.getDeadline().isBefore(LocalDate.now()) &&
-                project.getStatus() != EProjectStatus.COMPLETED;
-
-        return ProjectSummaryDTO.builder()
-                .id(project.getId())
-                .name(project.getName())
-                .status(project.getStatus())
-                .deadline(project.getDeadline())
-                .taskCount(taskCount)
-                .completionPercentage(Math.round(completionPercentage * 100.0) / 100.0)
-                .isOverdue(isOverdue)
-                .build();
-    }
 }

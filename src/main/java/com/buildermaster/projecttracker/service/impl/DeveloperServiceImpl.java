@@ -8,6 +8,7 @@ import com.buildermaster.projecttracker.exception.DuplicateResourceException;
 import com.buildermaster.projecttracker.exception.ResourceNotFoundException;
 import com.buildermaster.projecttracker.exception.UserNotFoundException;
 import com.buildermaster.projecttracker.exception.ValidationException;
+import com.buildermaster.projecttracker.mapper.DeveloperMapper;
 import com.buildermaster.projecttracker.model.*;
 import com.buildermaster.projecttracker.repository.DeveloperRepository;
 import com.buildermaster.projecttracker.repository.UserRepository;
@@ -16,6 +17,7 @@ import com.buildermaster.projecttracker.service.DeveloperService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -41,6 +43,7 @@ public class DeveloperServiceImpl implements DeveloperService {
     private final DeveloperRepository developerRepository;
     private final AuditService auditService;
     private final UserRepository userRepository;
+    private final DeveloperMapper developerMapper;
 
     private static final String ENTITY_TYPE = "Developer";
     private static final String SYSTEM_ACTOR = "ADMIN";
@@ -74,7 +77,7 @@ public class DeveloperServiceImpl implements DeveloperService {
         // Log audit
         auditService.logAction(EActionType.CREATE, ENTITY_TYPE, savedDeveloper.getId(), "DEVELOPER", savedDeveloper);
 
-        return mapToResponseDTO(savedDeveloper);
+        return developerMapper.toResponseDTO(savedDeveloper);
     }
 
     @Override
@@ -90,7 +93,7 @@ public class DeveloperServiceImpl implements DeveloperService {
                 });
 
         log.debug("Found developer: {}", developer.getName());
-        return mapToResponseDTO(developer);
+        return developerMapper.toResponseDTO(developer);
     }
 
     @Override
@@ -105,11 +108,11 @@ public class DeveloperServiceImpl implements DeveloperService {
                 developerPage.getNumber() + 1,
                 developerPage.getTotalPages());
 
-        return developerPage.map(this::mapToResponseDTO);
+        return developerPage.map(developerMapper::toResponseDTO);
     }
 
     @Override
-    @CacheEvict(value = {"developers", "allDevelopers"}, allEntries = true)
+    @CachePut(value = "developers", key = "#developerId")
     public DeveloperResponseDTO updateDeveloperProfile(UUID developerId, UpdateDeveloperRequestDTO updateRequest) {
         log.info("Updating developer with ID: {}", developerId);
 
@@ -138,7 +141,7 @@ public class DeveloperServiceImpl implements DeveloperService {
         // Log audit
         auditService.logAction(EActionType.UPDATE, ENTITY_TYPE, updatedDeveloper.getId(), SYSTEM_ACTOR, updatedDeveloper);
 
-        return mapToResponseDTO(updatedDeveloper);
+        return developerMapper.toResponseDTO(updatedDeveloper);
     }
 
     @Override
@@ -192,7 +195,7 @@ public class DeveloperServiceImpl implements DeveloperService {
                 });
 
         log.debug("Found Developer: {}", developer.getName());
-        return mapToResponseDTO(developer);
+        return developerMapper.toResponseDTO(developer);
     }
 
     @Override
@@ -206,7 +209,7 @@ public class DeveloperServiceImpl implements DeveloperService {
         log.debug("Found {} Top Developers", topDevelopers.getNumberOfElements());
 
         return topDevelopers.getContent().stream()
-                .map(this::mapToSummaryDTO)
+                .map(developerMapper::toSummaryDTO)
                 .collect(Collectors.toList());
     }
 
@@ -219,7 +222,7 @@ public class DeveloperServiceImpl implements DeveloperService {
         log.debug("Found {} developers without tasks", developersWithoutTasks.size());
 
         return developersWithoutTasks.stream()
-                .map(this::mapToSummaryDTO)
+                .map(developerMapper::toSummaryDTO)
                 .collect(Collectors.toList());
     }
 
@@ -236,7 +239,7 @@ public class DeveloperServiceImpl implements DeveloperService {
         log.debug("Found {} developers with tasks in status: {}", developers.size(), taskStatus);
 
         return developers.stream()
-                .map(this::mapToSummaryDTO)
+                .map(developerMapper::toSummaryDTO)
                 .collect(Collectors.toList());
     }
 
@@ -253,7 +256,7 @@ public class DeveloperServiceImpl implements DeveloperService {
         log.debug("Found {} developers matching name search: {}",
                 developerPage.getTotalElements(), name);
 
-        return developerPage.map(this::mapToResponseDTO);
+        return developerPage.map(developerMapper::toResponseDTO);
     }
 
     @Override
@@ -269,7 +272,7 @@ public class DeveloperServiceImpl implements DeveloperService {
         log.debug("Found {} developers matching skill search: {}",
                 developerPage.getTotalElements(), skill);
 
-        return developerPage.map(this::mapToResponseDTO);
+        return developerPage.map(developerMapper::toResponseDTO);
     }
 
     // ===== UTILITY METHODS =====
@@ -294,35 +297,5 @@ public class DeveloperServiceImpl implements DeveloperService {
         log.debug("Developers with tasks count: {}", count);
 
         return count;
-    }
-
-    // ===== PRIVATE HELPER METHODS =====
-
-    private DeveloperResponseDTO mapToResponseDTO(Developer developer) {
-        return DeveloperResponseDTO.builder()
-                .id(developer.getId())
-                .name(developer.getName())
-                .email(developer.getEmail())
-                .skills(developer.getSkills())
-                .totalTaskCount(developer.getTasks() != null ? developer.getTasks().size() : 0)
-                .createdDate(developer.getCreatedDate())
-                .updatedDate(developer.getUpdatedDate())
-                .build();
-    }
-
-    private DeveloperSummaryDTO mapToSummaryDTO(Developer developer) {
-        // Truncate skills for summary (first 100 characters)
-        String primarySkills = developer.getSkills();
-        if (primarySkills != null && primarySkills.length() > 100) {
-            primarySkills = primarySkills.substring(0, 100) + "...";
-        }
-
-        return DeveloperSummaryDTO.builder()
-                .id(developer.getId())
-                .name(developer.getName())
-                .email(developer.getEmail())
-                .primarySkills(primarySkills)
-                .totalTaskCount(developer.getTasks() != null ? developer.getTasks().size() : 0)
-                .build();
     }
 }

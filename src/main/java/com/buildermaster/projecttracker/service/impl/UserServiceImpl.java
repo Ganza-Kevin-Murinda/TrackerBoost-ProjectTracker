@@ -2,6 +2,7 @@ package com.buildermaster.projecttracker.service.impl;
 
 import com.buildermaster.projecttracker.dto.response.UserResponseDTO;
 import com.buildermaster.projecttracker.dto.response.UserSummaryDTO;
+import com.buildermaster.projecttracker.mapper.UserMapper;
 import com.buildermaster.projecttracker.model.EActionType;
 import com.buildermaster.projecttracker.model.EAuthProvider;
 import com.buildermaster.projecttracker.model.ERole;
@@ -22,7 +23,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -35,6 +35,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final JwtUtil jwtUtil;
+    private final UserMapper  userMapper;
 
     private static final String ENTITY_TYPE = "User";
 
@@ -65,7 +66,7 @@ public class UserServiceImpl implements UserService {
         log.info("Getting all users");
         return userRepository.findAllUserDetails()
                 .stream()
-                .map(this::mapToResponseDTO)
+                .map(userMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -100,7 +101,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserSummaryDTO getCurrentUserDetails() {
         log.info("Getting user's details");
-        return mapToSummaryDTO(getCurrentUser());
+        return userMapper.toSummaryDTO(getCurrentUser());
     }
 
     public User getCurrentUser() {
@@ -120,25 +121,6 @@ public class UserServiceImpl implements UserService {
         User updatedUser = userRepository.save(user);
         log.info("Assigned role {} to user {}", role, user.getUsername());
         auditService.logAction(EActionType.UPDATE, ENTITY_TYPE, updatedUser.getId(), "ADMIN", updatedUser);
-    }
-
-    private UserResponseDTO mapToResponseDTO(User user) {
-        return UserResponseDTO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .role(user.getRole())
-                .authProvider(user.getAuthProvider())
-                .createdDate(user.getCreatedDate())
-                .updatedDate(user.getUpdatedDate())
-                .build();
-    }
-
-    private UserSummaryDTO mapToSummaryDTO(User user) {
-        return UserSummaryDTO.builder()
-                .username(user.getUsername())
-                .role(user.getRole())
-                .authProvider(user.getAuthProvider())
-                .build();
     }
 
     @Override
