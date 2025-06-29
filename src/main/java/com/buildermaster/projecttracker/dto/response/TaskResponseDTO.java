@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -16,7 +18,9 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Schema(description = "Response DTO containing task information")
-public class TaskResponseDTO {
+public class TaskResponseDTO implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     @Schema(description = "Unique task identifier", example = "550e8400-e29b-41d4-a716-446655440000")
     private UUID id;
