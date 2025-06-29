@@ -62,7 +62,7 @@ public class Developer {
     @Column(name = "updated_date", nullable = false)
     private LocalDateTime updatedDate;
 
-    @OneToOne(optional = false)  // Every developer must be a user
+    @OneToOne(optional = false, fetch = FetchType.LAZY) // Every developer must be a user
     @JoinColumn(name = "user_id", referencedColumnName = "id", unique = true)
     private User user;
 
