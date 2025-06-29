@@ -41,7 +41,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/register", "/auth/login", "/login.html").permitAll()
+                        .requestMatchers("/auth/register", "/auth/login", "/login.html", "/actuator/**").permitAll()
                         // Group all Swagger-related paths together
                         .requestMatchers(
                                 "/swagger-ui.html",
