@@ -122,11 +122,6 @@ public class UserServiceImpl implements UserService {
         auditService.logAction(EActionType.UPDATE, ENTITY_TYPE, updatedUser.getId(), "ADMIN", updatedUser);
     }
 
-    @Override
-    public Optional<User> getUserByUsername(String email) {
-        return userRepository.findByUsername(email);
-    }
-
     private UserResponseDTO mapToResponseDTO(User user) {
         return UserResponseDTO.builder()
                 .id(user.getId())
