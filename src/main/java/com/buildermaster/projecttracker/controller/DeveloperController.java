@@ -43,7 +43,7 @@ public class DeveloperController {
     // ===== CRUD ENDPOINTS =====
 
     @PostMapping
-    @PreAuthorize("hasRole('DEVELOPER')")
+    @PreAuthorize("hasRole('DEVELOPER')or hasRole('ADMIN')")
     @Operation(summary = "Create a new developer profile")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Developer Profile created successfully"),
@@ -89,7 +89,7 @@ public class DeveloperController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('DEVELOPER')")
+    @PreAuthorize("hasRole('DEVELOPER')or hasRole('ADMIN')")
     @Operation(summary = "Update developer profile")
     public ResponseEntity<ApiResponseDTO<DeveloperResponseDTO>> updateDeveloperProfile(
             @Parameter(description = "Developer unique identifier") @PathVariable UUID id,
@@ -103,7 +103,7 @@ public class DeveloperController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')or hasRole('ADMIN')")
     @Operation(summary = "Delete developer profile")
     public ResponseEntity<ApiResponseDTO<Void>> deleteDeveloperProfile(
             @Parameter(description = "Developer unique identifier") @PathVariable UUID id) {
