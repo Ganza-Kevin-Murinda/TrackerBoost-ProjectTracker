@@ -104,6 +104,18 @@ jmeter -n -t jmeter/project-loadtest.jmx -l reports/results.jtl
 ```
 ---
 
+## 🎥 Video
+```bash
+https://screenrec.com/share/iuHmsGk7hS
+```
+---
+
+## 📒 Optimization Benchmarking Report
+```bash
+https://www.notion.so/Project-Tracker-Performance-Analysis-Report-2219d11ac5d5801a9da9f578dc301fca?source=copy_link
+```
+---
+
 ## 🎯 How to Run (Optimized)
 
 ```bash
